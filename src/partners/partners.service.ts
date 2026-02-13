@@ -63,11 +63,16 @@ export class PartnersService {
     xpathExpression: string
   ): SelectReturnType {
     const partnersXMLObj = this.getPartnersXMLObj();
-    return xpath.select(xpathExpression, partnersXMLObj);
+    // Sanitize the XPath expression to prevent injection
+    const sanitizedXpathExpression = this.sanitizeXpath(xpathExpression);
+    return xpath.select(sanitizedXpathExpression, partnersXMLObj);
   }
 
   private getFormattedXMLOutput(xmlNodes): string {
-    return `${this.XML_HEADER}\n<root>\n${xmlNodes.join('\n')}\n</root>`;
+    return `${this.XML_HEADER}
+<root>
+${xmlNodes.join('\n')}
+</root>`;
   }
 
   getPartnersProperties(xpathExpression: string): string {
@@ -83,5 +88,31 @@ export class PartnersService {
     }
 
     return this.getFormattedXMLOutput(xmlNodes);
+  }
+
+  getPartnersPropertiesWithParams(username: string, password: string): string {
+    const partnersXMLObj = this.getPartnersXMLObj();
+    const xpathExpression = `//partners/partner[username/text()='${this.escapeXPathValue(username)}' and password/text()='${this.escapeXPathValue(password)}']/*`;
+    const xmlNodes = xpath.select(xpathExpression, partnersXMLObj);
+
+    if (!Array.isArray(xmlNodes)) {
+      this.logger.debug(
+        `xmlNodes's type wasn't 'Array', and it's value was: ${xmlNodes}`
+      );
+      return this.getFormattedXMLOutput([]);
+    }
+
+    this.logger.debug(`Raw xpath xmlNodes value is: ${xmlNodes}`);
+    return this.getFormattedXMLOutput(xmlNodes);
+  }
+
+  private sanitizeXpath(xpathExpression: string): string {
+    // Basic sanitization to remove potentially dangerous characters
+    return xpathExpression.replace(/["'\[\]|]/g, '');
+  }
+
+  private escapeXPathValue(value: string): string {
+    // Escape single quotes in XPath values
+    return value.replace(/'/g, "''");
   }
 }
